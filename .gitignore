@@ -36,5 +36,4 @@ yarn-error.log*
 next-env.d.ts
 .vscode/settings.json
 
-/vendor/zenn-markdown-html/lib/
 /vendor/zenn-markdown-html/node_modules/
