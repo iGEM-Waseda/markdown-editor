@@ -21,6 +21,7 @@ const MarkdownEditorWithPreview = () => {
   const [hasFile, setHasFile] = useState(false);
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [wikiPreview, setWikiPreview] = useState(true);
   const isLocked = !hasFile || !confirmEdit;
   const mdeInstanceRef = useRef<EasyMDE | null>(null);
 
@@ -99,6 +100,14 @@ const MarkdownEditorWithPreview = () => {
           />
           .mdファイルの内容を変更する
         </label>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={wikiPreview}
+            onChange={(e) => setWikiPreview(e.target.checked)}
+          />
+          Wikiに実装した時のイメージを確認する
+        </label>
         {isLocked && (
           <span className="text-sm text-red-500">
             {!hasFile && 'ファイルをアップロードするまでエディタは無効です'}
@@ -106,7 +115,7 @@ const MarkdownEditorWithPreview = () => {
         )}
       </div>
       <div className="flex flex-1">
-        <div className="w-1/2 p-4 relative">
+        <div className={`${wikiPreview ? 'w-[25%]' : 'w-1/2'} pl-[30px] pr-4 py-4 relative`}>
           <SimpleMDE
             value={text}
             onChange={handleChange}
@@ -126,7 +135,7 @@ const MarkdownEditorWithPreview = () => {
             </div>
           )}
         </div>
-        <div className="w-1/2 p-4 bg-gray-100">
+        <div className={`${wikiPreview ? 'w-[75%]' : 'w-1/2'} pl-4 pr-[30px] py-4 bg-gray-100`}>
           <div className="flex justify-end">
             <button
               onClick={handleClick}
