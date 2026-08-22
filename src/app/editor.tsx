@@ -209,6 +209,12 @@ const MarkdownEditorWithPreview = () => {
         </div>
       </div>
       <div className="px-4 py-2 flex items-center gap-2">
+        <button
+          onClick={handleSend}
+          disabled={!hasFile || !allChecked || sending}
+          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+          {sending ? '送信中...' : '提出'}
+        </button>
         {sendResult && 'issueUrl' in sendResult && (
           <a
             href={sendResult.issueUrl}
@@ -221,12 +227,7 @@ const MarkdownEditorWithPreview = () => {
         {sendResult && 'error' in sendResult && (
           <span className="text-sm text-red-600">{sendResult.error}</span>
         )}
-        <button
-          onClick={handleSend}
-          disabled={!hasFile || !allChecked || sending}
-          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
-          {sending ? '送信中...' : '提出'}
-        </button>
+        
       </div>
     </div>
   );
