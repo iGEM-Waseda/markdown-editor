@@ -10,6 +10,17 @@ const SimpleMDE = dynamic(() => import('react-simplemde-editor'), {
   ssr: false,
 });
 
+const CHECKLIST_ITEMS = [
+  '見出し1〜4、太字、斜体、箇条書き、リンクが正しく反映されていますか？',
+  '画像は正しく表示されていますか？',
+  '表は正しく表示されていますか？',
+  '図・表タイトルは正しく反映されていますか？',
+  '参考・引用文献は[1]などの表示と文末の文献リストの両方が正しく反映されていますか？',
+  '数式・化学式は正しく表示されていますか？',
+  'PDFは正しく表示されていますか？',
+  'その他自分が意図した表示になっていますか？',
+];
+
 const MarkdownEditorWithPreview = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -24,6 +35,8 @@ const MarkdownEditorWithPreview = () => {
   const [wikiPreview, setWikiPreview] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ issueUrl: string } | { error: string } | null>(null);
+  const [checklist, setChecklist] = useState<boolean[]>(Array(CHECKLIST_ITEMS.length).fill(false));
+  const allChecked = checklist.every(Boolean);
   const isLocked = !hasFile || !confirmEdit;
   const mdeInstanceRef = useRef<EasyMDE | null>(null);
 
@@ -67,6 +80,7 @@ const MarkdownEditorWithPreview = () => {
         setFileName(file.name);
         setHasFile(true);
         setConfirmEdit(false);
+        setChecklist(Array(CHECKLIST_ITEMS.length).fill(false));
       }
     };
     reader.readAsText(file);
@@ -170,7 +184,31 @@ const MarkdownEditorWithPreview = () => {
           <div className="mt-4 znc" dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
       </div>
-      <div className="px-4 py-2 flex justify-end items-center gap-2">
+      <div className="px-4 py-2">
+        <p className={`text-xl font-semibold mb-2 ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
+          提出前チェックリスト(すべてチェックして提出)
+        </p>
+        <div className="flex flex-col gap-1">
+          {CHECKLIST_ITEMS.map((item, index) => (
+            <label
+              key={item}
+              className={`flex items-start gap-2 text-lg ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
+              <input
+                type="checkbox"
+                className="mt-[7.5px]"
+                checked={checklist[index]}
+                disabled={!hasFile}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setChecklist((prev) => prev.map((v, i) => (i === index ? checked : v)));
+                }}
+              />
+              <span>{item}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="px-4 py-2 flex items-center gap-2">
         {sendResult && 'issueUrl' in sendResult && (
           <a
             href={sendResult.issueUrl}
@@ -185,9 +223,9 @@ const MarkdownEditorWithPreview = () => {
         )}
         <button
           onClick={handleSend}
-          disabled={!hasFile || sending}
+          disabled={!hasFile || !allChecked || sending}
           className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
-          {sending ? '送信中...' : 'GitHubへ送信'}
+          {sending ? '送信中...' : '提出'}
         </button>
       </div>
     </div>
