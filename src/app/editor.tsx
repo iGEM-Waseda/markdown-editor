@@ -22,6 +22,8 @@ const MarkdownEditorWithPreview = () => {
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [fileName, setFileName] = useState('');
   const [wikiPreview, setWikiPreview] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ issueUrl: string } | { error: string } | null>(null);
   const isLocked = !hasFile || !confirmEdit;
   const mdeInstanceRef = useRef<EasyMDE | null>(null);
 
@@ -80,6 +82,27 @@ const MarkdownEditorWithPreview = () => {
       .catch(err => {
         console.error("Failed to copy text: ", err);
       });
+  };
+  const handleSend = async () => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch('/api/github/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName, content: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendResult({ error: data.error || '送信に失敗しました' });
+      } else {
+        setSendResult({ issueUrl: data.issueUrl });
+      }
+    } catch {
+      setSendResult({ error: '送信に失敗しました' });
+    } finally {
+      setSending(false);
+    }
   };
   return (
     <div className="flex min-h-screen mt-4 flex-col">
@@ -146,6 +169,26 @@ const MarkdownEditorWithPreview = () => {
           </div>
           <div className="mt-4 znc" dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
+      </div>
+      <div className="px-4 py-2 flex justify-end items-center gap-2">
+        {sendResult && 'issueUrl' in sendResult && (
+          <a
+            href={sendResult.issueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-green-700 underline">
+            送信しました(Issueを見る)
+          </a>
+        )}
+        {sendResult && 'error' in sendResult && (
+          <span className="text-sm text-red-600">{sendResult.error}</span>
+        )}
+        <button
+          onClick={handleSend}
+          disabled={!hasFile || sending}
+          className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
+          {sending ? '送信中...' : 'GitHubへ送信'}
+        </button>
       </div>
     </div>
   );
