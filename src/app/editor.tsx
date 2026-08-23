@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import markdownToHtml from 'zenn-markdown-html';
 import 'zenn-content-css';
 import type EasyMDE from 'easymde';
+import { ROOT_DIRS } from '@/lib/wiki';
 
 const SimpleMDE = dynamic(() => import('react-simplemde-editor'), {
   ssr: false,
@@ -36,6 +37,15 @@ const MarkdownEditorWithPreview = () => {
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ issueUrl: string } | { error: string } | null>(null);
   const [checklist, setChecklist] = useState<boolean[]>(Array(CHECKLIST_ITEMS.length).fill(false));
+  const [authorName, setAuthorName] = useState('');
+  const [comment, setComment] = useState('');
+  const [level1, setLevel1] = useState('');
+  const [level2, setLevel2] = useState('');
+  const [level3, setLevel3] = useState('');
+  const [level2Options, setLevel2Options] = useState<string[] | null>(null);
+  const [level3Options, setLevel3Options] = useState<string[] | null>(null);
+  const [dirLoading, setDirLoading] = useState(false);
+  const [dirError, setDirError] = useState('');
   const allChecked = checklist.every(Boolean);
   const isLocked = !hasFile || !confirmEdit;
   const mdeInstanceRef = useRef<EasyMDE | null>(null);
@@ -51,6 +61,53 @@ const MarkdownEditorWithPreview = () => {
       applyLockState(mdeInstanceRef.current, isLocked);
     }
   }, [isLocked]);
+
+  const fetchSubdirs = async (path: string): Promise<string[]> => {
+    const res = await fetch(`/api/github/list-dirs?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'ディレクトリ一覧の取得に失敗しました');
+    }
+    return data.directories as string[];
+  };
+  const handleLevel1Change = async (value: string) => {
+    setLevel1(value);
+    setLevel2('');
+    setLevel2Options(null);
+    setLevel3('');
+    setLevel3Options(null);
+    setDirError('');
+    if (!value) return;
+    setDirLoading(true);
+    try {
+      setLevel2Options(await fetchSubdirs(value));
+    } catch (err) {
+      setDirError(err instanceof Error ? err.message : 'ディレクトリ一覧の取得に失敗しました');
+    } finally {
+      setDirLoading(false);
+    }
+  };
+  const handleLevel2Change = async (value: string) => {
+    setLevel2(value);
+    setLevel3('');
+    setLevel3Options(null);
+    setDirError('');
+    if (!value) return;
+    setDirLoading(true);
+    try {
+      setLevel3Options(await fetchSubdirs(`${level1}/${value}`));
+    } catch (err) {
+      setDirError(err instanceof Error ? err.message : 'ディレクトリ一覧の取得に失敗しました');
+    } finally {
+      setDirLoading(false);
+    }
+  };
+  const level1HasNoSubdirs = level2Options !== null && level2Options.length === 0;
+  const level2HasNoSubdirs = level3Options !== null && level3Options.length === 0;
+  const targetDir = [level1, level2, level3].filter(Boolean).join('/');
+  const targetDirReady =
+    level1 !== '' &&
+    (level1HasNoSubdirs || (level2 !== '' && (level2HasNoSubdirs || level3 !== '')));
 
   function unescapeMarkdown(text: string): string {
     return text.replace(/\\([`*_{}\[\]()#+\-\.!=<>\\$])/g, '$1');
@@ -81,6 +138,14 @@ const MarkdownEditorWithPreview = () => {
         setHasFile(true);
         setConfirmEdit(false);
         setChecklist(Array(CHECKLIST_ITEMS.length).fill(false));
+        setAuthorName('');
+        setComment('');
+        setLevel1('');
+        setLevel2('');
+        setLevel3('');
+        setLevel2Options(null);
+        setLevel3Options(null);
+        setDirError('');
       }
     };
     reader.readAsText(file);
@@ -104,7 +169,7 @@ const MarkdownEditorWithPreview = () => {
       const res = await fetch('/api/github/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName, content: text }),
+        body: JSON.stringify({ fileName, content: text, authorName, targetDir, comment }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -208,10 +273,88 @@ const MarkdownEditorWithPreview = () => {
           ))}
         </div>
       </div>
+      <div className="px-4 py-2">
+        <p className={`text-sm font-semibold mb-2 ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
+          提出先
+        </p>
+        <div className="flex items-center gap-2">
+          <select
+            value={level1}
+            disabled={!hasFile}
+            onChange={(e) => handleLevel1Change(e.target.value)}
+            className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
+            <option value="">選択してください</option>
+            {ROOT_DIRS.map((dir) => (
+              <option key={dir} value={dir}>
+                {dir}
+              </option>
+            ))}
+          </select>
+          {level1 !== '' && !level1HasNoSubdirs && (
+            <select
+              value={level2}
+              disabled={level2Options === null}
+              onChange={(e) => handleLevel2Change(e.target.value)}
+              className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
+              <option value="">選択してください</option>
+              {(level2Options ?? []).map((dir) => (
+                <option key={dir} value={dir}>
+                  {dir}
+                </option>
+              ))}
+            </select>
+          )}
+          {level2 !== '' && !level2HasNoSubdirs && (
+            <select
+              value={level3}
+              disabled={level3Options === null}
+              onChange={(e) => setLevel3(e.target.value)}
+              className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed">
+              <option value="">選択してください</option>
+              {(level3Options ?? []).map((dir) => (
+                <option key={dir} value={dir}>
+                  {dir}
+                </option>
+              ))}
+            </select>
+          )}
+          {dirLoading && <span className="text-sm text-gray-500">読み込み中...</span>}
+        </div>
+        {dirError && <p className="text-sm text-red-600 mt-1">{dirError}</p>}
+        {targetDirReady && (
+          <p className="text-sm text-gray-600 mt-1">提出先: {targetDir}</p>
+        )}
+      </div>
+      <div className="px-4 py-2">
+        <label className={`flex items-center gap-2 text-sm ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
+          執筆責任者の名前:
+          <input
+            type="text"
+            value={authorName}
+            disabled={!hasFile}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder="例: 山田太郎"
+            className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          />
+        </label>
+      </div>
+      <div className="px-4 py-2">
+        <label className={`flex flex-col gap-1 text-sm ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
+          コメント(任意):
+          <textarea
+            value={comment}
+            disabled={!hasFile}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Web作成者への申し送り事項があれば入力してください"
+            rows={3}
+            className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          />
+        </label>
+      </div>
       <div className="px-4 py-2 flex items-center gap-2">
         <button
           onClick={handleSend}
-          disabled={!hasFile || !allChecked || sending}
+          disabled={!hasFile || !allChecked || !authorName.trim() || !targetDirReady || sending}
           className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
           {sending ? '送信中...' : '提出'}
         </button>

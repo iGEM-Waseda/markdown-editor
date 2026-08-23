@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
+import { encodeGithubPath, isValidTargetDir } from '@/lib/wiki';
 
 const GITHUB_API = 'https://api.github.com';
 
-function buildFileName(originalName: string): string {
+function buildFileName(originalName: string, targetDir: string): string {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const timestamp =
-    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
     `_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const safeName = (originalName || 'manuscript.md').replace(/[\\/:*?"<>|]/g, '_');
-  return `${timestamp}_${safeName}`;
+  // const safeName = (originalName || 'manuscript.md').replace(/[\\/:*?"<>|]/g, '_');
+  const dirPart = targetDir.replace(/\//g, '-');
+  return `${timestamp}_${dirPart}.md`;
 }
 
 export async function POST(request: Request) {
@@ -22,12 +24,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'GITHUB_TOKEN が設定されていません' }, { status: 500 });
   }
 
-  const { fileName, content } = (await request.json()) as { fileName?: string; content?: string };
+  const { fileName, content, authorName, targetDir, comment } = (await request.json()) as {
+    fileName?: string;
+    content?: string;
+    authorName?: string;
+    targetDir?: string;
+    comment?: string;
+  };
   if (typeof content !== 'string' || content.length === 0) {
     return NextResponse.json({ error: '原稿の内容が空です' }, { status: 400 });
   }
+  if (typeof authorName !== 'string' || authorName.trim().length === 0) {
+    return NextResponse.json({ error: '執筆責任者の名前が入力されていません' }, { status: 400 });
+  }
+  if (typeof targetDir !== 'string' || !isValidTargetDir(targetDir)) {
+    return NextResponse.json({ error: '提出先ディレクトリが不正です' }, { status: 400 });
+  }
 
-  const path = buildFileName(fileName ?? 'manuscript.md');
+  const generatedFileName = buildFileName(fileName ?? 'manuscript.md', targetDir);
+  const path = `${targetDir}/${generatedFileName}`;
   const ghHeaders = {
     Authorization: `Bearer ${token}`,
     Accept: 'application/vnd.github+json',
@@ -35,12 +50,12 @@ export async function POST(request: Request) {
   };
 
   const commitRes = await fetch(
-    `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
+    `${GITHUB_API}/repos/${owner}/${repo}/contents/${encodeGithubPath(path)}`,
     {
       method: 'PUT',
       headers: ghHeaders,
       body: JSON.stringify({
-        message: `原稿追加: ${path}`,
+        message: `${authorName}: ${generatedFileName}`,
         content: Buffer.from(content, 'utf-8').toString('base64'),
         branch,
       }),
@@ -58,8 +73,11 @@ export async function POST(request: Request) {
     method: 'POST',
     headers: ghHeaders,
     body: JSON.stringify({
-      title: `原稿確認済み: ${fileName || path}`,
-      body: `プレビューサイトで確認済みの原稿です。\n\n- ファイル: ${fileUrl}`,
+      title: `原稿確認済み: ${generatedFileName}（${authorName}）`,
+      body:
+        `執筆責任者: ${authorName}\n提出先ディレクトリ: ${targetDir}\n\n` +
+        `プレビューサイトで確認済みの原稿です。\n\n- ファイル: ${fileUrl}` +
+        (comment && comment.trim().length > 0 ? `\n\nコメント:\n${comment.trim()}` : ''),
     }),
   });
 
