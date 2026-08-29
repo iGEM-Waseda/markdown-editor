@@ -1,0 +1,8 @@
+type Toc = {
+    text: string;
+    id: string;
+    level: number;
+    children: Toc[];
+};
+export declare function parseToc(html: string): Toc[];
+export {};

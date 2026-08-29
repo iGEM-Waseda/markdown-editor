@@ -1,0 +1,59 @@
+{
+  "name": "zenn-markdown-html",
+  "version": "0.1.154-alpha.1",
+  "license": "MIT",
+  "description": "Convert markdown to zenn flavor html.",
+  "main": "lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zenn-dev/zenn-editor.git",
+    "directory": "packages/zenn-markdown-html"
+  },
+  "files": [
+    "lib"
+  ],
+  "exports": {
+    ".": "./lib/index.js",
+    "./lib/utils": "./lib/utils/index.js"
+  },
+  "scripts": {
+    "clean": "node -e \"const fs=require('fs');if(fs.existsSync('./lib'))fs.rmSync('./lib',{recursive:true,force:true});\"",
+    "build": "npm run clean && npm run build:src && npm run build:types",
+    "build:src": "babel ./src --extensions '.ts,.tsx' --ignore '**/*.d.ts' --out-dir ./lib",
+    "build:types": "tsc --project ./tsconfig.build.json",
+    "lint": "eslint . --ext .ts,.tsx",
+    "fix": "eslint . --ext .ts,.tsx --fix",
+    "strict:lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "test": "vitest run",
+    "prepare": ""
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^12.2.3",
+    "@types/node": "^18.13.0",
+    "@types/prismjs": "^1.26.0",
+    "@types/sanitize-html": "^2.8.0",
+    "@typescript-eslint/eslint-plugin": "^5.52.0",
+    "@typescript-eslint/parser": "^5.52.0",
+    "eslint": "^8.34.0",
+    "eslint-config-prettier": "^8.6.0",
+    "node-html-parser": "^6.1.4",
+    "vitest": "^0.34.4"
+  },
+  "dependencies": {
+    "@steelydylan/markdown-it-imsize": "^1.0.2",
+    "cheerio": "1.0.0-rc.12",
+    "markdown-it": "^12.3.2",
+    "markdown-it-anchor": "^8.6.6",
+    "markdown-it-container": "^2.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-inline-comments": "^1.0.1",
+    "markdown-it-link-attributes": "^4.0.1",
+    "markdown-it-task-lists": "^2.1.1",
+    "prismjs": "^1.29.0",
+    "sanitize-html": "^2.9.0"
+  },
+  "gitHead": "7da0b06004cf615e42e475de47011c4670eb7318",
+  "publishConfig": {
+    "access": "public"
+  }
+}
