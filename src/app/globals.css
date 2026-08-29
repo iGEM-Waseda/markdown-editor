@@ -32,6 +32,11 @@ body {
   }
 }
 
+.invalid-image-link {
+  background-color: rgba(239, 68, 68, 0.25);
+  border-bottom: 2px solid #ef4444;
+}
+
 .container-columns {
   display: flex;
   justify-content: space-between;

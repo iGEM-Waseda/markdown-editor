@@ -1,7 +1,7 @@
 "use client";
 import dynamic from 'next/dynamic';
 import 'easymde/dist/easymde.min.css';
-import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, ChangeEvent } from 'react';
 import markdownToHtml from 'zenn-markdown-html';
 import 'zenn-content-css';
 import type EasyMDE from 'easymde';
@@ -10,6 +10,58 @@ import { ROOT_DIRS } from '@/lib/wiki';
 const SimpleMDE = dynamic(() => import('react-simplemde-editor'), {
   ssr: false,
 });
+
+const REQUIRED_IMAGE_PREFIX = 'https://static.igem.wiki/teams/6144/';
+
+type ImageLinkIssue = { display: string; index: number; length: number };
+
+function findInvalidImageLinks(markdown: string): ImageLinkIssue[] {
+  const issues: ImageLinkIssue[] = [];
+
+  // インライン形式: ![alt](url) / <img src="url">
+  const inlinePatterns = [
+    /!\[[^\]]*\]\(\s*(\S+?)(?:\s+"[^"]*")?\s*\)/g,
+    /<img\s+[^>]*?src=["']([^"']+)["'][^>]*>/gi,
+  ];
+  for (const pattern of inlinePatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(markdown)) !== null) {
+      const url = match[1];
+      if (!url.startsWith(REQUIRED_IMAGE_PREFIX)) {
+        issues.push({ display: url, index: match.index, length: match[0].length });
+      }
+    }
+  }
+
+  // 参照形式: ![alt][label] + [label]: url であとから定義されるパターン
+  const refDefPattern = /^\[([^\]]+)\]:\s*<?([^\s>]+)>?/gm;
+  const refUrlByLabel = new Map<string, string>();
+  let defMatch: RegExpExecArray | null;
+  while ((defMatch = refDefPattern.exec(markdown)) !== null) {
+    refUrlByLabel.set(defMatch[1].trim().toLowerCase(), defMatch[2]);
+  }
+  const refImagePattern = /!\[[^\]]*\]\[([^\]]+)\]/g;
+  let refMatch: RegExpExecArray | null;
+  while ((refMatch = refImagePattern.exec(markdown)) !== null) {
+    const label = refMatch[1].trim().toLowerCase();
+    const url = refUrlByLabel.get(label);
+    if (url === undefined) {
+      issues.push({
+        display: `参照 [${refMatch[1]}] の定義が見つかりません`,
+        index: refMatch.index,
+        length: refMatch[0].length,
+      });
+    } else if (!url.startsWith(REQUIRED_IMAGE_PREFIX)) {
+      issues.push({
+        display: `${url}(参照 [${refMatch[1]}] 経由)`,
+        index: refMatch.index,
+        length: refMatch[0].length,
+      });
+    }
+  }
+
+  return issues;
+}
 
 const CHECKLIST_ITEMS = [
   '見出し1〜4、太字、斜体、箇条書き、リンクが正しく反映されていますか？',
@@ -49,6 +101,8 @@ const MarkdownEditorWithPreview = () => {
   const allChecked = checklist.every(Boolean);
   const isLocked = !hasFile || !confirmEdit;
   const mdeInstanceRef = useRef<EasyMDE | null>(null);
+  const imageMarkersRef = useRef<{ clear: () => void }[]>([]);
+  const invalidImageLinks = useMemo(() => findInvalidImageLinks(text), [text]);
 
   const applyLockState = (instance: EasyMDE, locked: boolean) => {
     instance.codemirror.setOption('readOnly', locked);
@@ -61,6 +115,18 @@ const MarkdownEditorWithPreview = () => {
       applyLockState(mdeInstanceRef.current, isLocked);
     }
   }, [isLocked]);
+
+  useEffect(() => {
+    const instance = mdeInstanceRef.current;
+    if (!instance) return;
+    const cm = instance.codemirror;
+    imageMarkersRef.current.forEach((marker) => marker.clear());
+    imageMarkersRef.current = invalidImageLinks.map((issue) => {
+      const from = cm.posFromIndex(issue.index);
+      const to = cm.posFromIndex(issue.index + issue.length);
+      return cm.markText(from, to, { className: 'invalid-image-link' });
+    });
+  }, [invalidImageLinks]);
 
   const fetchSubdirs = async (path: string): Promise<string[]> => {
     const res = await fetch(`/api/github/list-dirs?path=${encodeURIComponent(path)}`);
@@ -249,6 +315,20 @@ const MarkdownEditorWithPreview = () => {
           <div className="mt-4 znc" dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
       </div>
+      {invalidImageLinks.length > 0 && (
+        <div className="px-4 py-2">
+          <p className="text-sm font-semibold text-red-600 mb-1">
+            画像リンクが {REQUIRED_IMAGE_PREFIX} から始まっていません(該当箇所はエディタ内で赤くハイライトされています)。修正するまで提出できません。
+          </p>
+          <ul className="text-sm text-red-600 list-disc list-inside">
+            {invalidImageLinks.map((issue, i) => (
+              <li key={`${issue.index}-${i}`} className="break-all">
+                {issue.display}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="px-4 py-2">
         <p className={`text-xl font-semibold mb-2 ${!hasFile ? 'text-gray-400' : 'text-gray-700'}`}>
           提出前チェックリスト(すべてチェックして提出)
@@ -345,7 +425,7 @@ const MarkdownEditorWithPreview = () => {
             value={comment}
             disabled={!hasFile}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Web作成者への申し送り事項があれば入力してください"
+            placeholder="Wiki班への申し送り事項があれば入力してください"
             rows={3}
             className="border rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
@@ -354,7 +434,14 @@ const MarkdownEditorWithPreview = () => {
       <div className="px-4 py-2 flex items-center gap-2">
         <button
           onClick={handleSend}
-          disabled={!hasFile || !allChecked || !authorName.trim() || !targetDirReady || sending}
+          disabled={
+            !hasFile ||
+            !allChecked ||
+            !authorName.trim() ||
+            !targetDirReady ||
+            invalidImageLinks.length > 0 ||
+            sending
+          }
           className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">
           {sending ? '送信中...' : '提出'}
         </button>
