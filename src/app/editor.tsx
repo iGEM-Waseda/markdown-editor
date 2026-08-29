@@ -20,7 +20,7 @@ function findInvalidImageLinks(markdown: string): ImageLinkIssue[] {
 
   // インライン形式: ![alt](url) / <img src="url">
   const inlinePatterns = [
-    /!\[[^\]]*\]\(\s*(\S+?)(?:\s+"[^"]*")?\s*\)/g,
+    /!\[[^\]]*\]\(\s*([^\s)]+)[^)]*\)/g,
     /<img\s+[^>]*?src=["']([^"']+)["'][^>]*>/gi,
   ];
   for (const pattern of inlinePatterns) {
@@ -274,7 +274,7 @@ const MarkdownEditorWithPreview = () => {
             checked={wikiPreview}
             onChange={(e) => setWikiPreview(e.target.checked)}
           />
-          Wikiに実装した時のイメージを確認する
+          Wikiと同じ画面幅で確認する
         </label>
         {isLocked && (
           <span className="text-sm text-red-500">
