@@ -177,3 +177,55 @@ details summary:hover {
     }
   }
 }
+
+.znc table {
+  display: table !important; /* zenn-content-cssのdisplay:blockだとthead/tbodyの幅がtable要素の幅と一致せず中央寄せが崩れるため上書き(同specificityのため!important必須) */
+  font-size: 14px;
+  max-width: 90%;
+  /* table-layout: fixed; */
+  border-collapse: collapse; /* ボーダーを重ならないようにする */
+  border-top: none; /* テーブルの上部にボーダーを表示しない */
+  border-bottom: none;
+  word-break : break-all;
+  overflow-x:auto;
+  font-family: 'Merriweather', sans-serif;
+  margin: 1.5rem auto;
+}
+
+/* テーブルの奇数行に対して背景色を設定 */
+.znc table tr:nth-child(odd) {
+  background-color: #ffffff; /* 奇数行の背景色 */
+}
+
+/* テーブルの偶数行に対して背景色を設定 */
+.znc table tr:nth-child(even) {
+  background-color: #f2f2f2; /* 偶数行の背景色 */
+}
+
+/* テーブルの行にホバーしたときの背景色を設定 */
+.znc table tr:hover td {
+  background-color: #e0e0e0; /* ホバー時の背景色(bodyセル) */
+}
+
+.znc table tr:hover th {
+  background-color: #005090; /* ホバー時の背景色(見出しセル、元の青より少し暗く) */
+}
+
+/* テーブルセルのスタイル (td と th に適用) */
+.znc table td, .znc table th {
+  padding: 12px; /* セル内の余白を設定 */
+  border: 1px solid #ddd; /* セルの境界線を設定 */
+  text-align: center; /* テキストを中央揃え */
+}
+
+/* ヘッダーセルのスタイル */
+.znc table th {
+  background-color: #0067B7; /* ヘッダーの背景色 */
+  color: white; /* ヘッダーのテキストカラー */
+}
+.znc td:nth-child(1), /* 最初の列 */
+.znc td:nth-child(2), /* 2番目の列 */
+.znc td:nth-child(3) /* 3番目の列 */
+{
+  max-width: 20%;
+}
